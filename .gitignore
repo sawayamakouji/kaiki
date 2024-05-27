@@ -1,0 +1,22 @@
+# Python virtual environment
+venv/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# VS Code
+.vscode/
+.history/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Other files
+*.log
+*.sqlite3
+*.egg-info
