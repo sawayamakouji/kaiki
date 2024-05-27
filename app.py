@@ -1,8 +1,7 @@
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, render_template, send_file
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
-import datetime
 import os
 
 app = Flask(__name__)
@@ -90,11 +89,14 @@ def upload_file():
     # Create a DataFrame from the results
     results_df = pd.DataFrame(results)
 
-    # Save the DataFrame to a CSV file
-    csv_file = 'predictions.csv'
-    results_df.to_csv(csv_file, index=False)
+    # Pivot the DataFrame to have the desired format
+    pivot_df = results_df.pivot_table(index='date', columns=['weather', 'promotion'], values='predicted_sales').reset_index()
 
-    return render_template('results.html', tables=[results_df.to_html(classes='data', header="true")], csv_file=csv_file)
+    # Save the pivoted DataFrame to a CSV file
+    csv_file = 'predictions.csv'
+    pivot_df.to_csv(csv_file, index=False)
+
+    return render_template('results.html', tables=[pivot_df.to_html(classes='data', header="true", index=False)], csv_file=csv_file)
 
 @app.route('/download/<filename>')
 def download_file(filename):
