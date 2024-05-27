@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
@@ -31,79 +31,40 @@ def train_model(df):
     return model, X.columns  # return the model and the feature names
 
 # Predict future sales
-def predict_sales(model, start_date, end_date, df, feature_names, store_name, product_name, weather, promotion):
+def predict_sales(model, start_date, end_date, df, feature_names):
     future_dates = pd.date_range(start=start_date, end=end_date)
     future_data = []
+    conditions = []
+    
+    weathers = ['clear', 'rainy', 'snowy']
+    promotions = ['none', 'discount', 'special']
+    
     for date in future_dates:
-        day_of_week = date.weekday()
-        month = date.month
-        day = date.day
+        for weather in weathers:
+            for promotion in promotions:
+                day_of_week = date.weekday()
+                month = date.month
+                day = date.day
 
-        data = {'day_of_week': day_of_week, 'month': month, 'day': day,
-                'weather_clear': 1 if weather == 'clear' else 0,
-                'weather_rainy': 1 if weather == 'rainy' else 0,
-                'weather_snowy': 1 if weather == 'snowy' else 0,
-                'promotion_none': 1 if promotion == 'none' else 0,
-                'promotion_discount': 1 if promotion == 'discount' else 0,
-                'promotion_special': 1 if promotion == 'special' else 0}
-
-        future_data.append(data)
+                data = {'day_of_week': day_of_week, 'month': month, 'day': day,
+                        'weather_clear': 1 if weather == 'clear' else 0,
+                        'weather_rainy': 1 if weather == 'rainy' else 0,
+                        'weather_snowy': 1 if weather == 'snowy' else 0,
+                        'promotion_none': 1 if promotion == 'none' else 0,
+                        'promotion_discount': 1 if promotion == 'discount' else 0,
+                        'promotion_special': 1 if promotion == 'special' else 0}
+                
+                future_data.append(data)
+                conditions.append((date, weather, promotion))
     
     future_df = pd.DataFrame(future_data)
     future_df = future_df[feature_names]  # Ensure the columns are in the same order as in training
     predictions = model.predict(future_df)
-    return predictions, future_dates
+    return predictions, conditions
 
 @app.route('/')
 def index():
-    html_content = """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Sales Prediction</title>
-    </head>
-    <body>
-        <h1>Upload Sales Data and Predict Future Sales</h1>
-        <form action="/upload" method="post" enctype="multipart/form-data">
-            <label for="file">Upload CSV:</label>
-            <input type="file" id="file" name="file" accept=".csv" required><br><br>
-
-            <label for="start_date">Start Date (YYYY-MM-DD):</label>
-            <input type="date" id="start_date" name="start_date" required><br><br>
-
-            <label for="end_date">End Date (YYYY-MM-DD):</label>
-            <input type="date" id="end_date" name="end_date" required><br><br>
-
-            <h2>Enter New Data:</h2>
-
-            <label for="store_name">Store Name:</label>
-            <input type="text" id="store_name" name="store_name" required><br><br>
-
-            <label for="product_name">Product Name:</label>
-            <input type="text" id="product_name" name="product_name" required><br><br>
-
-            <label for="weather">Weather:</label>
-            <select id="weather" name="weather" required>
-                <option value="clear">Clear</option>
-                <option value="rainy">Rainy</option>
-                <option value="snowy">Snowy</option>
-            </select><br><br>
-
-            <label for="promotion">Promotion:</label>
-            <select id="promotion" name="promotion" required>
-                <option value="none">None</option>
-                <option value="discount">Discount</option>
-                <option value="special">Special</option>
-            </select><br><br>
-
-            <input type="submit" value="Predict">
-        </form>
-    </body>
-    </html>
-    """
-    return render_template_string(html_content)
+    return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -113,14 +74,18 @@ def upload_file():
 
     start_date = request.form['start_date']
     end_date = request.form['end_date']
-    store_name = request.form['store_name']
-    product_name = request.form['product_name']
-    weather = request.form['weather']
-    promotion = request.form['promotion']
     
-    predictions, future_dates = predict_sales(model, start_date, end_date, df, feature_names, store_name, product_name, weather, promotion)
+    predictions, conditions = predict_sales(model, start_date, end_date, df, feature_names)
     
-    results = {str(date.date()): prediction for date, prediction in zip(future_dates, predictions)}
+    results = []
+    for (date, weather, promotion), prediction in zip(conditions, predictions):
+        results.append({
+            'date': str(date.date()),
+            'weather': weather,
+            'promotion': promotion,
+            'predicted_sales': prediction
+        })
+    
     return jsonify(results)
 
 if __name__ == '__main__':
