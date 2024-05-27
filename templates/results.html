@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediction Results</title>
+</head>
+<body>
+    <h1>Prediction Results</h1>
+    <table border="1">
+        <tr>
+            <th>Date</th>
+            <th>Prediction</th>
+        </tr>
+        {% for date, prediction in results.items() %}
+        <tr>
+            <td>{{ date }}</td>
+            <td>{{ prediction }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <br><br>
+    <a href="/">Go back</a>
+    <a href="{{ url_for('download_csv', start_date=start_date, end_date=end_date, store_name=store_name, product_name=product_name, weather=weather, promotion=promotion) }}">Download CSV</a>
+</body>
+</html>

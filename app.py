@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, render_template, send_file
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 import datetime
+import io
 
 app = Flask(__name__)
 
@@ -31,36 +32,28 @@ def train_model(df):
     return model, X.columns  # return the model and the feature names
 
 # Predict future sales
-def predict_sales(model, start_date, end_date, df, feature_names):
+def predict_sales(model, start_date, end_date, df, feature_names, store_name, product_name, weather, promotion):
     future_dates = pd.date_range(start=start_date, end=end_date)
     future_data = []
-    conditions = []
-    
-    weathers = ['clear', 'rainy', 'snowy']
-    promotions = ['none', 'discount', 'special']
-    
     for date in future_dates:
-        for weather in weathers:
-            for promotion in promotions:
-                day_of_week = date.weekday()
-                month = date.month
-                day = date.day
+        day_of_week = date.weekday()
+        month = date.month
+        day = date.day
 
-                data = {'day_of_week': day_of_week, 'month': month, 'day': day,
-                        'weather_clear': 1 if weather == 'clear' else 0,
-                        'weather_rainy': 1 if weather == 'rainy' else 0,
-                        'weather_snowy': 1 if weather == 'snowy' else 0,
-                        'promotion_none': 1 if promotion == 'none' else 0,
-                        'promotion_discount': 1 if promotion == 'discount' else 0,
-                        'promotion_special': 1 if promotion == 'special' else 0}
-                
-                future_data.append(data)
-                conditions.append((date, weather, promotion))
+        data = {'day_of_week': day_of_week, 'month': month, 'day': day,
+                'weather_clear': 1 if weather == 'clear' else 0,
+                'weather_rainy': 1 if weather == 'rainy' else 0,
+                'weather_snowy': 1 if weather == 'snowy' else 0,
+                'promotion_none': 1 if promotion == 'none' else 0,
+                'promotion_discount': 1 if promotion == 'discount' else 0,
+                'promotion_special': 1 if promotion == 'special' else 0}
+
+        future_data.append(data)
     
     future_df = pd.DataFrame(future_data)
     future_df = future_df[feature_names]  # Ensure the columns are in the same order as in training
     predictions = model.predict(future_df)
-    return predictions, conditions
+    return predictions, future_dates
 
 @app.route('/')
 def index():
@@ -74,19 +67,43 @@ def upload_file():
 
     start_date = request.form['start_date']
     end_date = request.form['end_date']
+    store_name = request.form['store_name']
+    product_name = request.form['product_name']
+    weather = request.form['weather']
+    promotion = request.form['promotion']
     
-    predictions, conditions = predict_sales(model, start_date, end_date, df, feature_names)
+    predictions, future_dates = predict_sales(model, start_date, end_date, df, feature_names, store_name, product_name, weather, promotion)
     
-    results = []
-    for (date, weather, promotion), prediction in zip(conditions, predictions):
-        results.append({
-            'date': str(date.date()),
-            'weather': weather,
-            'promotion': promotion,
-            'predicted_sales': prediction
-        })
+    results = {str(date.date()): prediction for date, prediction in zip(future_dates, predictions)}
     
-    return jsonify(results)
+    return render_template('results.html', results=results, start_date=start_date, end_date=end_date, store_name=store_name, product_name=product_name, weather=weather, promotion=promotion)
+
+@app.route('/download_csv')
+def download_csv():
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    store_name = request.args.get('store_name')
+    product_name = request.args.get('product_name')
+    weather = request.args.get('weather')
+    promotion = request.args.get('promotion')
+
+    # 再度データを読み込み、予測を行う
+    df = preprocess_data(request.files['file'])
+    model, feature_names = train_model(df)
+    predictions, future_dates = predict_sales(model, start_date, end_date, df, feature_names, store_name, product_name, weather, promotion)
+    
+    results = pd.DataFrame({
+        "Date": [date.date() for date in future_dates],
+        "Prediction": predictions
+    })
+
+    csv_data = results.to_csv(index=False)
+    return send_file(
+        io.BytesIO(csv_data.encode()),
+        mimetype="text/csv",
+        as_attachment=True,
+        attachment_filename="predictions.csv"
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
