@@ -96,11 +96,14 @@ def upload_file():
     csv_file = 'predictions.csv'
     pivot_df.to_csv(csv_file, index=False)
 
-    return render_template('results.html', tables=[pivot_df.to_html(classes='data', header="true", index=False)], csv_file=csv_file)
+    return render_template('results.html', tables=[pivot_df.to_html(classes='data', index=False, header=False)], csv_file=csv_file)
 
 @app.route('/download/<filename>')
 def download_file(filename):
     return send_file(filename, as_attachment=True)
 
+
+
 if __name__ == '__main__':
     app.run(debug=True)
+ 
